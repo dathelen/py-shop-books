@@ -6,9 +6,11 @@ authors = ["Dave Thelen <dt@mavy.farm>"]
 license = "BSD-3"
 
 [tool.poetry.dependencies]
+intuit-oauth = "1.2.3"
 python = "^3.8"
 python-quickbooks = "^0.8.4"
-intuit-oauth = "^1.2.4"
+PyYAML = "^5.4.1"
+pandas = "^1.2.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.2"
