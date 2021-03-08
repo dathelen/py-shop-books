@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "py-shop-books"
+version = "0.1.0"
+description = ""
+authors = ["Dave Thelen <dt@mavy.farm>"]
+license = "BSD-3"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+python-quickbooks = "^0.8.4"
+intuit-oauth = "^1.2.4"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.2"
+black = "^20.8b1"
+pytest-black = "^0.3.12"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
