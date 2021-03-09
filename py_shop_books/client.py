@@ -9,7 +9,7 @@ def connect(client_id=None, client_secret=None, refresh_token=None, redirect_uri
             client_id=client_id,
             client_secret=client_secret,
             environment=environment,
-            redirect_uri='http://localhost:8000/app/callback'
+            redirect_uri=redirect_uri
         )
 
 
