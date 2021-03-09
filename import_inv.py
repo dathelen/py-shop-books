@@ -54,6 +54,7 @@ def main():
        exit(-1)
         
     orders = {}
+
     with open('orders_export_1.csv', newline='') as data:
         transactions = csv.DictReader(data, delimiter=',')
         last_row = None
