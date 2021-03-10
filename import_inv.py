@@ -15,6 +15,34 @@ ENV = 'PRODUCTION'
 def read_shop_export(transactions):
     pass
     
+def create_invoice(order, client):
+   #first need to find customer in quicken
+    if order.customer['key'] == 'Billing Company':
+       # search on subet of company entry
+       search = order.customer['value'].split()[0]
+       if search == 'The':
+         search = 'Chapel'
+       customers = Customer.where("Active = True and CompanyName LIKE '%{}%'".format(search), 
+                                  qb=client)
+       if len(customers) == 0:
+           print("Did not find a match for {}".format(search))
+       else:
+           print("Order #{} is for customer: {}".format(order.id, str(customers[0])))
+           order.customer_id = customers[0].Id
+    elif order.customer['key'] == 'Billing Name':
+        try:
+            last_name = order.customer['value'].split()[1]
+        except IndexError:
+            last_name = order.customer['value']
+
+        customers = Customer.where("Active = True and FamilyName LIKE '%{}%'".format(last_name), 
+                                  qb=client)
+        if len(customers) == 0:
+            print("Did not find a match for {}".format(order.customer['value']))
+        else:
+            print("Order #{} is for customer: {}".format(order.id, str(customers[0])))
+            order.customer_id = customers[0].Id
+
 def parse_customer_info(row):
     # shopify doesn't enforce exactly where customer info goes so we get to guess
     # Its in 1 of 3 locations, in order of preference:
@@ -76,7 +104,7 @@ def main():
             last_row = id
     print("total orders is {}".format(len(orders.keys())))
     for k,v in orders.items():
-        print("Cost for {0} is {1}".format(k, v.total_cost()))
+        create_invoice(v, client)
 
 
 
