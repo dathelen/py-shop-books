@@ -1,8 +1,8 @@
 class ShopifyItem(object):
     def __init__(self, *args, **kwargs):
         self.__name = kwargs['name']
-        self.__quanity = kwargs['quantity']
-        self.__unit_price = kwargs['unit_price']
+        self.__quantity = int(kwargs['quantity'])
+        self.__unit_price = float(kwargs['unit_price'])
 
     @property
     def name(self):
@@ -15,14 +15,14 @@ class ShopifyItem(object):
        return self.__quantity
     @quantity.setter
     def quantity(self):
-       self.__quantity = value
+       self.__quantity = int(value)
     @property
     def unit_price(self):
        return self.__unit_price
 
     @unit_price.setter
     def unit_price(self, value):
-       self.__unit_price = value
+       self.__unit_price = int(value)
 
 
     def total_price(self):

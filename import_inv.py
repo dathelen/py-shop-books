@@ -23,11 +23,11 @@ def parse_customer_info(row):
     # 3. Try Guess from Email
     key = None
     value = None
-    if row['Billing Customer'] != '' 
-        key = 'Billing Customer'
-    elif row['Billing Name'] != ''
+    if row['Billing Company'] != '': 
+        key = 'Billing Company'
+    elif row['Billing Name'] != '':
         key = 'Billing Name'
-    elif row['Email'] != ''
+    elif row['Email'] != '':
         key = 'Email'
 
     if key is not None:
@@ -60,22 +60,23 @@ def main():
         last_row = None
         for row in transactions:
             id = row['Name']
-            print('current row is {}'.format(id))
-            new_item = ShopifyItem(name=row['Lineitem name'], quanity=row['Lineitem quantity'],
+            new_item = ShopifyItem(name=row['Lineitem name'], quantity=row['Lineitem quantity'],
                                    unit_price = row['Lineitem price'])
 
             if last_row == id:
-               print('Same Transaction')
                orders[row['Name'].replace('#', '')].add_item(new_item)
             else:
-               print('New Transaction')
-               order = ShopifyOrder(name=row['Name']) 
+               print('New Transaction: {}'.format(row['Name']))
+               order = ShopifyOrder(id=row['Name']) 
                order.customer = parse_customer_info(row)
                order.add_item(new_item)
 
                orders[row['Name'].replace('#', '')] = order
 
             last_row = id
+    print("total orders is {}".format(len(orders.keys())))
+    for k,v in orders.items():
+        print("Cost for {0} is {1}".format(k, v.total_cost()))
 
 
 
