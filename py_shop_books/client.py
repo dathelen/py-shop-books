@@ -16,7 +16,8 @@ def connect(client_id=None, client_secret=None, refresh_token=None, redirect_uri
     client = QuickBooks(
         auth_client=auth_client,
         refresh_token=refresh_token,
-        company_id=company_id
+        company_id=company_id,
+        minor_version=57
     )
 
     return client

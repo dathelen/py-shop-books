@@ -2,20 +2,56 @@ import csv
 import pandas as pd
 import yaml
 import json
+import urllib
 from py_shop_books.client import connect
 from py_shop_books.order import ShopifyOrder
 from py_shop_books.item import ShopifyItem
 from intuitlib.exceptions import AuthClientError
 from quickbooks.objects.customer import Customer
+from quickbooks.objects.item import Item
+from quickbooks.objects.account import Account
 
 
 CFG_FILE = '/home/dt/.pyshopcfg.yaml'
 ENV = 'PRODUCTION'
 V = 2
+
 def read_shop_export(transactions):
     pass
+
+def create_qb_item(name, price, client, income_account, item_type='Service'):
+    new_item = Item()
+    new_item.Name = name
+    new_item.Type = item_type
+    new_item.UnitPrice = price
+    new_item.IncomeAccountRef = income_account.to_ref()
+    new_item.save(qb=client)
+    return new_item
     
-def find_customer_id(order, client):
+
+def find_qb_item_ids(items, client, income_account='Income', income_sub_account='Sales'):
+    # get qb item account ids
+    income_account = Account.where("AccountType = 'Income' and AccountSubType = 'SalesOfProductIncome' and Name = 'Sales'", 
+                                    qb=client)
+
+    for item in items:
+        print('searching for {}'.format(item.name))
+        search_item = item.name.replace("'", " ").replace("  ", " ").strip()
+        print(search_item)
+        qb_item = Item.where("Name LIKE '{}'".format((search_item)), qb=client)
+        if len(qb_item) == 0:
+            # need to create item because its not found
+            print(f'item {item.name} not found, creating...')
+            new_item = create_qb_item(search_item, item.unit_price, client, income_account[0])
+            print(f'item {item.name} created with id {new_item.Id}')
+            item.qb_item = new_item
+        else:
+            item.qb_item = qb_item[0]
+            
+
+
+     
+def find_qb_customer_id(order, client):
     customers = []
     customer_id = None
     #first need to find customer in quicken
@@ -35,7 +71,7 @@ def find_customer_id(order, client):
             if V > 2:
                 print(f'found {len(customers)} that matched {search}')
                 print("Order #{} is for customer: {}".format(order.id, str(customers[0])))
-            customer_id = customers[0].Id
+            customer_id = customers[0]
 
 
     if order.customer['Billing Name']!= '' and len(customers) == 0:
@@ -53,7 +89,7 @@ def find_customer_id(order, client):
             if V > 2:
                 print(f'found {len(customers)} that matched {last_name}')
                 print("Order #{} is for customer: {}".format(order.id, str(customers[0])))
-            customer_id = customers[0].Id
+            customer_id = customers[0]
 
     if order.customer['Email'] != '' and len(customers) == 0:
         email = order.customer['Email'].split('@')[1].split('.')[0]
@@ -70,7 +106,7 @@ def find_customer_id(order, client):
             if V > 2:
                 print(f'found {len(customers)} that matched {email}')
                 print("Order #{} is for customer: {}".format(order.id, str(customers[0])))
-            customer_id = customers[0].Id
+            customer_id = customers[0]
     if len(customers) > 0 and V > 1:
         print(f'Order {order.id} is for customer {str(customers[0])}')
     return customer_id
@@ -99,6 +135,7 @@ def main():
                          environment=ENV.lower())
     except AuthClientError:
        print('You need a new refresh token.  Run the server in the SampleOauth2_UsingPythonClient: python manage.py runserer if you are in the sandbox.  If you are in Prod you need ot get one from the Developer Dashboard Redirect')
+       print(AuthClientError.error)
        exit(-1)
         
     orders = {}
@@ -124,9 +161,10 @@ def main():
             last_row = id
     print("total orders is {}".format(len(orders.keys())))
     for k,v in orders.items():
-        v.customer_id = find_customer_id(v, client)
+        v.customer_id = find_qb_customer_id(v, client)
         if v.customer_id is None:
             print(f'No customer found for order {k}')
+        find_qb_item_ids(v.items, client)
             
    
 
