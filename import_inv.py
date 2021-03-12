@@ -1,5 +1,4 @@
 import csv
-import pandas as pd
 import yaml
 import json
 import urllib
@@ -10,15 +9,45 @@ from intuitlib.exceptions import AuthClientError
 from quickbooks.objects.customer import Customer
 from quickbooks.objects.item import Item
 from quickbooks.objects.account import Account
+from quickbooks.objects.invoice import Invoice
+from quickbooks.objects.detailline import SalesItemLine, SalesItemLineDetail
+from quickbooks.helpers import qb_date_format
+from datetime import date
+
 
 
 CFG_FILE = '/home/dt/.pyshopcfg.yaml'
 ENV = 'PRODUCTION'
 V = 2
 
-def read_shop_export(transactions):
-    pass
+def create_invoices(order, client):
+    invoice = Invoice()
+    invoice.AllowIPNPayment = False
+    invoice.CustomerRef = order.customer_id.to_ref()
+    del invoice.CustomerRef.type
+    qb_date = order.order_date.split()[0].split('-')
+    print(qb_date)
+    invoice.TxnDate = qb_date_format(date(int(qb_date[0]), int(qb_date[1]), int(qb_date[2])))
+    invoice.DueDate = invoice.TxnDate
+    for index, item in enumerate(order.items):
+       line = SalesItemLine()
+       del line.CustomField
+       line.LineNum = index + 1
+       line.Description = item.name 
+       line.Amount = item.total_price()
+       line.SalesItemLineDetail = {'ItemRef': {'name': item.qb_item.Name, 
+                                               'value': item.qb_item.Id
+                                              },
+                                   'Qty': item.quantity,
+                                   'UnitPrice': item.unit_price
+                                  }
+       invoice.Line.append(line)
+    created_invoice =  invoice.save(qb=client)
+    print(f'created invoice {created_invoice.DocNumber}')
+    exit()
 
+    
+    
 def create_qb_item(name, price, client, income_account, item_type='Service'):
     new_item = Item()
     new_item.Name = name
@@ -155,8 +184,11 @@ def main():
                order = ShopifyOrder(id=row['Name']) 
                order.customer = parse_customer_info(row)
                order.add_item(new_item)
+               order.order_date = row['Paid at']
+               print(order.order_date)
 
                orders[row['Name'].replace('#', '')] = order
+
 
             last_row = id
     print("total orders is {}".format(len(orders.keys())))
@@ -165,6 +197,7 @@ def main():
         if v.customer_id is None:
             print(f'No customer found for order {k}')
         find_qb_item_ids(v.items, client)
+        create_invoices(v, client)
             
    
 

@@ -4,6 +4,7 @@ class ShopifyOrder(object):
        self.__items = []
        self.__customer  = None
        self.__customer_id = None
+       self.__order_date = None
     @property
     def items(self):
         return self.__items
@@ -28,6 +29,20 @@ class ShopifyOrder(object):
     @customer_id.setter
     def customer_id(self, value):
         self.__customer_id = value
+
+    @property
+    def customer_id(self):
+        return self.__customer_id
+    @customer_id.setter
+    def customer_id(self, value):
+        self.__customer_id = value
+
+    @property
+    def order_date(self):
+        return self.__order_date
+    @order_date.setter
+    def order_date(self, value):
+        self.__order_date = value
 
 
     def add_item(self, value):
