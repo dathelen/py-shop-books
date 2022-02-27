@@ -9,7 +9,7 @@ class ShopifyItem(object):
     def name(self):
        return self.__name
     @name.setter
-    def name(self):
+    def name(self, value):
        self.__name = value
 
     @property

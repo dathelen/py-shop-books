@@ -16,7 +16,6 @@ class ShopifyOrder(object):
     def id(self, value):
         self.__id = value
 
-
     @property
     def customer(self):
         return self.__customer
@@ -43,7 +42,6 @@ class ShopifyOrder(object):
     @order_date.setter
     def order_date(self, value):
         self.__order_date = value
-
 
     def add_item(self, value):
         self.__items.append(value)

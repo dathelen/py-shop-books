@@ -18,14 +18,19 @@ from datetime import date
 
 CFG_FILE = '/home/dt/.pyshopcfg.yaml'
 ENV = 'PRODUCTION'
-V = 2
+V = 3
+DEBUG = False
 
 def create_invoices(order, client):
     invoice = Invoice()
     invoice.AllowIPNPayment = False
     invoice.CustomerRef = order.customer_id.to_ref()
     del invoice.CustomerRef.type
-    qb_date = order.order_date.split()[0].split('-')
+    try:
+        qb_date = order.order_date.split()[0].split('-')
+    except IndexError:
+        print('no paid dat found, skipping..')
+        return
     print(qb_date)
     invoice.TxnDate = qb_date_format(date(int(qb_date[0]), int(qb_date[1]), int(qb_date[2])))
     invoice.DueDate = invoice.TxnDate
@@ -33,9 +38,9 @@ def create_invoices(order, client):
        line = SalesItemLine()
        del line.CustomField
        line.LineNum = index + 1
-       line.Description = item.name 
+       line.Description = item.name
        line.Amount = item.total_price()
-       line.SalesItemLineDetail = {'ItemRef': {'name': item.qb_item.Name, 
+       line.SalesItemLineDetail = {'ItemRef': {'name': item.qb_item.Name,
                                                'value': item.qb_item.Id
                                               },
                                    'Qty': item.quantity,
@@ -44,30 +49,47 @@ def create_invoices(order, client):
        invoice.Line.append(line)
     created_invoice =  invoice.save(qb=client)
     print(f'created invoice {created_invoice.DocNumber}')
-    exit()
 
-    
-    
+
+def create_customer(name, email, client):
+    print(name)
+    print(email)
+    new_customer = Customer()
+    new_customer.CompanyName = name
+    new_customer.DisplayName = name
+    try:
+        new_customer.FamilyName = name.split()[1]
+    except IndexError:
+        new_customer.FamilyName = name.split()[0]
+    new_customer.GivenName = name.split()[0]
+    return new_customer.save(qb=client)
+
+
 def create_qb_item(name, price, client, income_account, item_type='Service'):
+
     new_item = Item()
-    new_item.Name = name
+    new_item.Name = name.encode('utf-8')
     new_item.Type = item_type
     new_item.UnitPrice = price
     new_item.IncomeAccountRef = income_account.to_ref()
     new_item.save(qb=client)
     return new_item
-    
+
 
 def find_qb_item_ids(items, client, income_account='Income', income_sub_account='Sales'):
     # get qb item account ids
-    income_account = Account.where("AccountType = 'Income' and AccountSubType = 'SalesOfProductIncome' and Name = 'Sales'", 
+    income_account = Account.where("AccountType = 'Income' and AccountSubType = 'SalesOfProductIncome' and Name = 'Sales'",
                                     qb=client)
 
     for item in items:
+        if 'Mother' in item.name:
+            item.name = "Mothers Day Bouqet"
+        elif 'White Frills' in item.name:
+            item.name = "Sweet pea White Frills off-the-vine"
         print('searching for {}'.format(item.name))
         search_item = item.name.replace("'", " ").replace("  ", " ").strip()
         print(search_item)
-        qb_item = Item.where("Name LIKE '{}'".format((search_item)), qb=client)
+        qb_item = Item.where("Name LIKE '{}'".format(search_item), qb=client)
         if len(qb_item) == 0:
             # need to create item because its not found
             print(f'item {item.name} not found, creating...')
@@ -76,22 +98,23 @@ def find_qb_item_ids(items, client, income_account='Income', income_sub_account=
             item.qb_item = new_item
         else:
             item.qb_item = qb_item[0]
-            
 
 
-     
+
 def find_qb_customer_id(order, client):
     customers = []
     customer_id = None
     #first need to find customer in quicken
     if V > 2:
         print('trying to find customers for order {}'.format(order.id))
+        print(order.customer)
     if order.customer['Billing Company'] != '':
+        print('first check')
         try:
             search = order.customer['Billing Company'].split()[0]
         except IndexError:
             search = order.customer['Billing Company']
-        customers = Customer.where("Active = True and CompanyName LIKE '%{}%'".format(search), 
+        customers = Customer.where("Active = True and CompanyName LIKE '%{}%'".format(search),
                                   qb=client)
         if len(customers) == 0:
             if V > 2:
@@ -109,7 +132,7 @@ def find_qb_customer_id(order, client):
         except IndexError:
             last_name = order.customer['Billing Name']
 
-        customers = Customer.where("Active = True and FamilyName LIKE '%{}%'".format(last_name), 
+        customers = Customer.where("Active = True and FamilyName LIKE '%{}%'".format(last_name),
                                   qb=client)
         if len(customers) == 0:
             if V > 2:
@@ -122,10 +145,9 @@ def find_qb_customer_id(order, client):
 
     if order.customer['Email'] != '' and len(customers) == 0:
         email = order.customer['Email'].split('@')[1].split('.')[0]
-        if V > 2:
-            print(f'email is {email}')
-        if email == 'gmail':
+        if email == 'gmail' or email == 'earthlink':
             email = order.customer['Email']
+        print(f'email is {email}')
         customers = Customer.where("Active = True and PrimaryEmailAddr LIKE '%{}%'".format(email),
                           qb=client)
         if len(customers) == 0:
@@ -136,6 +158,14 @@ def find_qb_customer_id(order, client):
                 print(f'found {len(customers)} that matched {email}')
                 print("Order #{} is for customer: {}".format(order.id, str(customers[0])))
             customer_id = customers[0]
+    if len(customers) == 0:
+        # need to create new customer
+        print('creating new customer')
+        cust = create_customer(order.customer['Billing Name'], order.customer['Email'], client)
+        customers.append(cust)
+        customer_id = cust
+
+
     if len(customers) > 0 and V > 1:
         print(f'Order {order.id} is for customer {str(customers[0])}')
     return customer_id
@@ -163,13 +193,13 @@ def main():
                          client_config[ENV]['COMPANY_ID'],
                          environment=ENV.lower())
     except AuthClientError:
-       print('You need a new refresh token.  Run the server in the SampleOauth2_UsingPythonClient: python manage.py runserer if you are in the sandbox.  If you are in Prod you need ot get one from the Developer Dashboard Redirect')
-       print(AuthClientError.error)
-       exit(-1)
-        
+
+        print('You need a new refresh token.  Run the server in the SampleOauth2_UsingPythonClient: python manage.py runserer if you are in the sandbox.  If you are in Prod you need ot get one from the Developer Dashboard Redirect')
+        exit(-1)
+
     orders = {}
 
-    with open('orders_export_1.csv', newline='') as data:
+    with open('2021_orders.csv', newline='') as data:
         transactions = csv.DictReader(data, delimiter=',')
         last_row = None
         for row in transactions:
@@ -181,7 +211,7 @@ def main():
                orders[row['Name'].replace('#', '')].add_item(new_item)
             else:
                print('New Transaction: {}'.format(row['Name']))
-               order = ShopifyOrder(id=row['Name']) 
+               order = ShopifyOrder(id=row['Name'])
                order.customer = parse_customer_info(row)
                order.add_item(new_item)
                order.order_date = row['Paid at']
@@ -189,17 +219,17 @@ def main():
 
                orders[row['Name'].replace('#', '')] = order
 
-
             last_row = id
+
     print("total orders is {}".format(len(orders.keys())))
+    count  = 0
     for k,v in orders.items():
         v.customer_id = find_qb_customer_id(v, client)
         if v.customer_id is None:
             print(f'No customer found for order {k}')
         find_qb_item_ids(v.items, client)
-        create_invoices(v, client)
-            
-   
+        if not DEBUG:
+            create_invoices(v, client)
 
 if __name__ == "__main__":
     main()
